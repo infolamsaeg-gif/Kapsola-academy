@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الطالب — منصّة الثانوية</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="mobile-topbar">
+  <button onclick="toggleSide()">☰ القائمة</button>
+  <b>لوحة الطالب</b>
+  <span></span>
+</div>
+
+<div class="app-shell">
+  <aside class="side">
+    <div class="flex space-between">
+      <div class="brand">📘 منصّة الثانوية</div>
+      <button onclick="toggleSide()" class="btn btn-ghost-light btn-sm" style="display:none;" id="closeSideBtn">✕</button>
+    </div>
+    <nav>
+      <a href="#" class="active">📚 حصصي</a>
+      <a href="#" onclick="alert('قريبًا: متجر الكتب والملازم'); return false;">🛒 المتجر</a>
+      <a href="#" onclick="alert('قريبًا: شات الدعم الفني'); return false;">💬 اسأل مساعد المدرس</a>
+      <a href="#" onclick="alert('قريبًا: لوحة شرف الأبطال'); return false;">🏆 لوحة الشرف</a>
+      <a href="#" onclick="logout(); return false;">🚪 تسجيل الخروج</a>
+    </nav>
+    <div class="user-card">
+      <b id="sideUserName">—</b>
+      <span id="sideUserGrade">—</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>حصص الفيزياء — يوسف أحمد</h1>
+      <span class="badge live">مشترك — نشط</span>
+    </div>
+
+    <div class="content">
+      <div class="kpi-row">
+        <div class="kpi gold"><span>نسبة الإنجاز</span><b id="kpiProgress">0%</b></div>
+        <div class="kpi forest"><span>أعلى درجة كويز</span><b id="kpiBestQuiz">—</b></div>
+        <div class="kpi"><span>حصص متبقية</span><b id="kpiRemaining">—</b></div>
+        <div class="kpi brick"><span>تنبيهات التراكم</span><b>0</b></div>
+      </div>
+
+      <div class="panel" id="playerPanel" style="display:none;">
+        <div class="panel-head">
+          <h2 id="playerTitle">عرض الحصة</h2>
+          <button class="btn btn-outline btn-sm" onclick="closePlayer()">إغلاق ✕</button>
+        </div>
+        <div class="panel-body">
+          <div class="player-wrap" id="playerWrap">
+            <div class="player-fake">
+              ▶ محاكاة تشغيل فيديو الحصة<br><span class="small" style="color:#9FB0C9;">(في الإنتاج الحقيقي: فيديو محمي عبر Firebase Storage + رابط مؤقت Signed URL)</span>
+            </div>
+            <div class="quiz-gate-lock" id="gateLock">
+              <div style="font-size:32px;">🔒</div>
+              <h3 style="color:#fff;">لازم تخلّص كويز الحصة الأولانية</h3>
+              <p style="color:#C9D2E0; margin:0;">مش هتقدر تفتح الحصة الجاية غير بعد النجاح في الكويز بنسبة 60% على الأقل.</p>
+            </div>
+          </div>
+          <div class="flex space-between" style="margin-top:14px;">
+            <span class="small text-soft">مدة الحصة: <b id="playerDuration">—</b></span>
+            <button class="btn btn-primary btn-sm" id="finishBtn" onclick="finishWatching()">أنهيت المشاهدة — روح للكويز</button>
+          </div>
+
+          <div class="quiz-box hidden" id="quizBox">
+            <h3>كويز الحصة</h3>
+            <p class="small text-soft">لازم تجاوب صح في 60% على الأقل عشان الحصة الجاية تتفتح.</p>
+            <div id="quizQuestions"></div>
+            <button class="btn btn-gold" onclick="submitCurrentQuiz()">تسليم الإجابات</button>
+            <div id="quizResult" style="margin-top:14px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>خطة الحصص — الميكانيكا</h2>
+          <span class="small text-soft">نظام حصص متتابعة (Drip Content)</span>
+        </div>
+        <div class="panel-body" id="lessonsList"><!-- JS --></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script src="js/watermark.js"></script>
+<script>
+const user = requireAuth('student');
+let currentLesson = null;
+let watermarkTimer = null;
+
+function render(){
+  if(!user) return;
+  document.getElementById('sideUserName').textContent = user.name;
+  document.getElementById('sideUserGrade').textContent = user.grade || '';
+
+  const lessons = getLessonsWithStatus(user.id);
+  const doneCount = lessons.filter(l => l.done).length;
+  const progress = Math.round((doneCount / lessons.length) * 100);
+  document.getElementById('kpiProgress').textContent = progress + '%';
+  document.getElementById('kpiRemaining').textContent = (lessons.length - doneCount) + ' حصة';
+
+  const data = db();
+  const scores = Object.values(data.progress[user.id]?.quizScores || {});
+  document.getElementById('kpiBestQuiz').textContent = scores.length ? Math.max(...scores) + '%' : '—';
+
+  const list = document.getElementById('lessonsList');
+  list.innerHTML = '';
+  lessons.forEach(l => {
+    const row = document.createElement('div');
+    row.className = 'lesson-row ' + (l.locked ? 'locked' : '') + (l.done ? ' done' : '');
+    row.innerHTML = `
+      <div class="idx">${l.done ? '✓' : l.order}</div>
+      <div class="meta">
+        <b>${l.title}</b>
+        <span>المدة: ${l.duration}</span>
+      </div>
+      <div>
+        ${l.locked
+          ? '<span class="badge locked">🔒 مقفولة</span>'
+          : l.done
+            ? '<span class="badge done">تمت</span>'
+            : `<button class="btn btn-primary btn-sm" onclick="openLesson('${l.id}')">مشاهدة</button>`}
+      </div>`;
+    list.appendChild(row);
+  });
+}
+
+function openLesson(lessonId){
+  const data = db();
+  currentLesson = data.lessons.find(l => l.id === lessonId);
+  document.getElementById('playerTitle').textContent = currentLesson.title;
+  document.getElementById('playerDuration').textContent = currentLesson.duration;
+  document.getElementById('playerPanel').style.display = 'block';
+  document.getElementById('quizBox').classList.add('hidden');
+  document.getElementById('finishBtn').classList.remove('hidden');
+  document.getElementById('playerPanel').scrollIntoView({behavior:'smooth'});
+
+  if(watermarkTimer) clearInterval(watermarkTimer);
+  watermarkTimer = startWatermark(document.getElementById('playerWrap'), user);
+}
+
+function closePlayer(){
+  document.getElementById('playerPanel').style.display = 'none';
+  if(watermarkTimer) clearInterval(watermarkTimer);
+}
+
+function finishWatching(){
+  document.getElementById('finishBtn').classList.add('hidden');
+  const box = document.getElementById('quizBox');
+  box.classList.remove('hidden');
+  const data = db();
+  const quiz = data.quizzes[currentLesson.quizId];
+  const qDiv = document.getElementById('quizQuestions');
+  qDiv.innerHTML = '';
+  quiz.questions.forEach((q, qi) => {
+    const block = document.createElement('div');
+    block.className = 'quiz-q';
+    block.innerHTML = `<p>${qi+1}. ${q.q}</p>` + q.options.map((opt,oi) =>
+      `<label class="quiz-opt"><input type="radio" name="q${qi}" value="${oi}"> ${opt}</label>`
+    ).join('');
+    qDiv.appendChild(block);
+  });
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function submitCurrentQuiz(){
+  const data = db();
+  const quiz = data.quizzes[currentLesson.quizId];
+  const answers = quiz.questions.map((_, qi) => {
+    const picked = document.querySelector(`input[name="q${qi}"]:checked`);
+    return picked ? parseInt(picked.value) : -1;
+  });
+  const res = submitQuiz(user.id, currentLesson.quizId, answers);
+  const resultDiv = document.getElementById('quizResult');
+  if(res.passed){
+    resultDiv.innerHTML = `<div class="form-msg show ok">🎉 مبروك! درجتك ${res.score}% (${res.correct}/${res.total}) — الحصة الجاية اتفتحت.</div>`;
+  } else {
+    resultDiv.innerHTML = `<div class="form-msg show error">درجتك ${res.score}% (${res.correct}/${res.total}) — لازم 60% عشان تعدي. حاول تاني.</div>`;
+  }
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
