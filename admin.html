@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الأدمن — منصّة الثانوية</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="mobile-topbar">
+  <button onclick="toggleSide()">☰ القائمة</button>
+  <b>لوحة الأدمن</b>
+  <span></span>
+</div>
+
+<div class="app-shell">
+  <aside class="side">
+    <div class="brand">📘 منصّة الثانوية</div>
+    <nav>
+      <a href="#" class="active">🖥️ نظرة عامة</a>
+      <a href="#" onclick="alert('قريبًا: إدارة حسابات المدرسين'); return false;">👨‍🏫 المدرسون</a>
+      <a href="#" onclick="alert('قريبًا: إدارة كل الطلاب'); return false;">🎓 الطلاب</a>
+      <a href="#" onclick="alert('قريبًا: سجل كل المدفوعات + تسوية الأرباح'); return false;">💳 المدفوعات</a>
+      <a href="#" onclick="logout(); return false;">🚪 تسجيل الخروج</a>
+    </nav>
+    <div class="user-card"><b id="adminName">—</b><span>مدير المنصة</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><h1>نظرة عامة على المنصة</h1><span class="badge live">كل الأنظمة تعمل</span></div>
+    <div class="content">
+      <div class="kpi-row">
+        <div class="kpi gold"><span>إجمالي الطلاب</span><b id="kpiTotalStudents">—</b></div>
+        <div class="kpi"><span>إجمالي المدرسين</span><b id="kpiTotalTeachers">—</b></div>
+        <div class="kpi forest"><span>إجمالي المدفوعات</span><b id="kpiTotalRevenue">—</b></div>
+        <div class="kpi brick"><span>تنبيهات أمان (جهاز مكرر)</span><b>0</b></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>المدرسون وأرباحهم</h2></div>
+        <div class="panel-body">
+          <table class="ledger">
+            <thead><tr><th>المدرس</th><th>المادة</th><th>عدد الطلاب</th><th>الأرباح</th></tr></thead>
+            <tbody id="teachersBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>كل المدفوعات</h2></div>
+        <div class="panel-body">
+          <table class="ledger">
+            <thead><tr><th>الطالب</th><th>الخدمة</th><th>المبلغ</th><th>الطريقة</th><th>التاريخ</th></tr></thead>
+            <tbody id="paymentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const user = requireAuth('admin');
+if(user){
+  document.getElementById('adminName').textContent = user.name;
+  const data = db();
+  const students = data.users.filter(u => u.role === 'student');
+  const teachers = data.users.filter(u => u.role === 'teacher');
+  document.getElementById('kpiTotalStudents').textContent = students.length;
+  document.getElementById('kpiTotalTeachers').textContent = teachers.length;
+  const totalRevenue = data.payments.reduce((s,p)=>s+p.amount,0);
+  document.getElementById('kpiTotalRevenue').textContent = totalRevenue.toLocaleString('ar-EG') + ' ج.م';
+
+  document.getElementById('teachersBody').innerHTML = teachers.map(t => `
+    <tr><td>${t.name}</td><td>${t.subject}</td><td>${t.studentsCount}</td><td>${t.earnings.toLocaleString('ar-EG')} ج.م</td></tr>
+  `).join('');
+
+  document.getElementById('paymentsBody').innerHTML = data.payments.map(p => `
+    <tr><td>${p.student}</td><td>${p.item}</td><td>${p.amount} ج.م</td><td>${p.method}</td><td>${p.date}</td></tr>
+  `).join('');
+}
+</script>
+</body>
+</html>
