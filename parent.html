@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة ولي الأمر — منصّة الثانوية</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="mobile-topbar">
+  <button onclick="toggleSide()">☰ القائمة</button>
+  <b>لوحة ولي الأمر</b>
+  <span></span>
+</div>
+
+<div class="app-shell">
+  <aside class="side">
+    <div class="brand">📘 منصّة الثانوية</div>
+    <nav>
+      <a href="#" class="active">👨‍👦 متابعة ابني</a>
+      <a href="#" onclick="alert('قريبًا: سجل المدفوعات الكامل'); return false;">💳 المدفوعات</a>
+      <a href="#" onclick="alert('قريبًا: تواصل مباشر مع المدرس'); return false;">💬 تواصل مع المدرس</a>
+      <a href="#" onclick="logout(); return false;">🚪 تسجيل الخروج</a>
+    </nav>
+    <div class="user-card">
+      <b id="parentName">—</b>
+      <span>ولي أمر</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><h1 id="childHeading">متابعة الطالب</h1><span class="badge live">تحديث لحظي</span></div>
+    <div class="content">
+      <div class="kpi-row">
+        <div class="kpi gold"><span>نسبة الإنجاز</span><b id="kpiProgress">—</b></div>
+        <div class="kpi forest"><span>أعلى درجة كويز</span><b id="kpiBest">—</b></div>
+        <div class="kpi"><span>حصص متراكمة (لم تُشاهد)</span><b id="kpiPending">—</b></div>
+        <div class="kpi brick"><span>غياب هذا الشهر</span><b>0 أيام</b></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>سجل الحصص</h2></div>
+        <div class="panel-body">
+          <table class="ledger">
+            <thead><tr><th>الحصة</th><th>الحالة</th></tr></thead>
+            <tbody id="lessonsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>درجات الكويزات</h2></div>
+        <div class="panel-body">
+          <table class="ledger">
+            <thead><tr><th>الكويز</th><th>الدرجة</th></tr></thead>
+            <tbody id="quizzesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const user = requireAuth('parent');
+if(user){
+  document.getElementById('parentName').textContent = user.name;
+  const data = db();
+  const child = data.users.find(u => u.id === user.childId);
+  document.getElementById('childHeading').textContent = 'متابعة الطالب: ' + (child ? child.name : '—');
+
+  if(child){
+    const lessons = getLessonsWithStatus(child.id);
+    const doneCount = lessons.filter(l => l.done).length;
+    document.getElementById('kpiProgress').textContent = Math.round((doneCount/lessons.length)*100) + '%';
+    document.getElementById('kpiPending').textContent = (lessons.length - doneCount);
+
+    const prog = data.progress[child.id] || { quizScores:{} };
+    const scores = Object.values(prog.quizScores);
+    document.getElementById('kpiBest').textContent = scores.length ? Math.max(...scores) + '%' : '—';
+
+    document.getElementById('lessonsBody').innerHTML = lessons.map(l => `
+      <tr><td>${l.title}</td><td>${
+        l.done ? '<span class="badge done">تمت المشاهدة</span>'
+        : l.locked ? '<span class="badge locked">لسه متفتحتش</span>'
+        : '<span class="badge pending">متاحة الآن</span>'
+      }</td></tr>`).join('');
+
+    document.getElementById('quizzesBody').innerHTML = Object.entries(prog.quizScores).map(([qid, score]) => `
+      <tr><td>${qid}</td><td>${score}%</td></tr>`).join('') || '<tr><td colspan="2" class="text-soft">لسه مفيش كويزات اتحلت</td></tr>';
+  }
+}
+</script>
+</body>
+</html>
