@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة المدرس — منصّة الثانوية</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="mobile-topbar">
+  <button onclick="toggleSide()">☰ القائمة</button>
+  <b>لوحة المدرس</b>
+  <span></span>
+</div>
+
+<div class="app-shell">
+  <aside class="side">
+    <div class="brand">📘 منصّة الثانوية</div>
+    <nav>
+      <a href="#" class="active">📊 نظرة عامة</a>
+      <a href="#" onclick="alert('قريبًا: رفع حصة جديدة + ربطها بكويز'); return false;">🎬 إدارة الحصص</a>
+      <a href="#" onclick="alert('قريبًا: بنك الأسئلة'); return false;">📝 بنك الأسئلة</a>
+      <a href="#" onclick="alert('قريبًا: شات الدعم مع الطلاب'); return false;">💬 رسائل الطلاب</a>
+      <a href="#" onclick="logout(); return false;">🚪 تسجيل الخروج</a>
+    </nav>
+    <div class="user-card">
+      <b id="teacherName">—</b>
+      <span id="teacherSubject">—</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar"><h1>مرحبًا بيك، مستر</h1><span class="badge live">حسابك موثّق</span></div>
+    <div class="content">
+      <div class="kpi-row">
+        <div class="kpi gold"><span>عدد الطلاب</span><b id="kpiStudents">—</b></div>
+        <div class="kpi forest"><span>الأرباح هذا الشهر</span><b id="kpiEarnings">—</b></div>
+        <div class="kpi"><span>متوسط الدرجات</span><b>76%</b></div>
+        <div class="kpi brick"><span>محاولات نسخ مكتشفة</span><b>0</b></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>طلابي</h2>
+          <span class="small text-soft">مرتّبين حسب نسبة الإنجاز</span>
+        </div>
+        <div class="panel-body">
+          <table class="ledger">
+            <thead><tr><th>الطالب</th><th>الصف</th><th>الحصص المكتملة</th><th>آخر درجة كويز</th><th>الحالة</th></tr></thead>
+            <tbody id="studentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>مدفوعات هذا الأسبوع</h2></div>
+        <div class="panel-body">
+          <table class="ledger">
+            <thead><tr><th>الطالب</th><th>الخدمة</th><th>المبلغ</th><th>الطريقة</th><th>الحالة</th></tr></thead>
+            <tbody id="paymentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const user = requireAuth('teacher');
+if(user){
+  document.getElementById('teacherName').textContent = user.name;
+  document.getElementById('teacherSubject').textContent = 'مدرّس ' + user.subject;
+  document.getElementById('kpiStudents').textContent = user.studentsCount;
+  document.getElementById('kpiEarnings').textContent = user.earnings.toLocaleString('ar-EG') + ' ج.م';
+
+  const data = db();
+  const students = data.users.filter(u => u.role === 'student');
+  document.getElementById('studentsBody').innerHTML = students.map(s => {
+    const prog = data.progress[s.id] || { completedLessons:[], quizScores:{} };
+    const scores = Object.values(prog.quizScores);
+    const last = scores.length ? scores[scores.length-1] + '%' : '—';
+    return `<tr>
+      <td>${s.name}</td><td>${s.grade || '—'}</td>
+      <td>${prog.completedLessons.length} / ${data.lessons.length}</td>
+      <td>${last}</td>
+      <td><span class="badge done">نشط</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('paymentsBody').innerHTML = data.payments.map(p => `
+    <tr><td>${p.student}</td><td>${p.item}</td><td>${p.amount} ج.م</td><td>${p.method}</td>
+    <td><span class="badge done">${p.status}</span></td></tr>
+  `).join('');
+}
+</script>
+</body>
+</html>
